@@ -1,12 +1,19 @@
 {
   "expo": {
+    "name": "PhoolBasketSellerDashboard",
+    "slug": "phool-basket-seller-dashboard",
+    "version": "1.0.0",
+    "sdkVersion": "49.0.0",
+    "platforms": ["android", "ios"],
+    "android": {
+      "package": "com.aanki2607.phoolbasketsellerdashboard",
+      "versionCode": 1
+    },
     "extra": {
       "eas": {
         "projectId": "f37b764c-9d84-4619-892c-8cc9da348e54"
       }
-    },
-    "android": {
-      "package": "com.aanki2607.phoolbasketsellerdashboard"
     }
   }
 }
+
