@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, StatusBar, Dimensions, Platform,
+  ScrollView, StatusBar, Dimensions, Platform, ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthService } from "../utils/auth";
+import { Api } from "../utils/api";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -112,24 +113,38 @@ function StatCard({ icon, iconBg, value, label, change, up }) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminOverview({ navigation }) {
   const [activeTab, setActiveTab] = useState("Revenue");
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Calculate chart width: screen - card margins(14*2)
   const chartW = SCREEN_W - 28;
 
-  const topItems = [
-    { label: "Roses", val: 85, color: "#ef4444" },
-    { label: "Sunfl.", val: 72, color: "#f97316" },
-    { label: "Lily", val: 60, color: "#22c55e" },
-    { label: "Tulips", val: 38, color: "#a855f7" },
-  ];
+  const loadDashboard = useCallback(async () => {
+    try {
+      const result = await Api.getDashboardStats();
+      setDashboard(result);
+    } catch {
+      setDashboard(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const recentOrders = [
-    { id: "#2041", customer: "Priya Sharma", item: "Rose Bouquet", amount: "₹1,200", status: "Delivered", sc: "#16a34a" },
-    { id: "#2040", customer: "Rahul Verma", item: "Sunflower", amount: "₹850", status: "Pending", sc: "#d97706" },
-    { id: "#2039", customer: "Sneha Patel", item: "Lily Bouquet", amount: "₹2,100", status: "Processing", sc: "#3b82f6" },
-    { id: "#2038", customer: "Amit Joshi", item: "Mixed Tulips", amount: "₹640", status: "Cancelled", sc: "#dc2626" },
-    { id: "#2037", customer: "Divya Mehta", item: "Orchid Pack", amount: "₹1,800", status: "Delivered", sc: "#16a34a" },
-  ];
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
+  const admin = dashboard?.admin;
+  const platform = dashboard?.platform;
+  const topItems = admin?.topItems || [];
+  const recentOrders = admin?.recentOrders || [];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#ec4899" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -159,10 +174,10 @@ export default function AdminOverview({ navigation }) {
 
         {/* ── Stat Cards ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-          <StatCard icon="$" iconBg="#3b82f6" value="$48,329" label="Total Revenue" change="+13.5%" up />
-          <StatCard icon="🛍" iconBg="#f59e0b" value="2,847" label="Total Sales" change="+8.2%" up />
-          <StatCard icon="📋" iconBg="#ef4444" value="317" label="Orders Today" change="-4.1%" up={false} />
-          <StatCard icon="👥" iconBg="#22c55e" value="1,294" label="Active Customers" change="+24.6%" up />
+          <StatCard icon="$" iconBg="#3b82f6" value={admin?.totalRevenue || "$0"} label="Total Revenue" change="+13.5%" up />
+          <StatCard icon="🛍" iconBg="#f59e0b" value={admin?.totalSales || "0"} label="Total Sales" change="+8.2%" up />
+          <StatCard icon="📋" iconBg="#ef4444" value={admin?.ordersToday || "0"} label="Orders Today" change="-4.1%" up={false} />
+          <StatCard icon="👥" iconBg="#22c55e" value={admin?.activeCustomers || "0"} label="Active Customers" change="+24.6%" up />
         </ScrollView>
 
         {/* ── Top Items ── */}
@@ -232,10 +247,10 @@ export default function AdminOverview({ navigation }) {
           <Text style={styles.cardTitle}>Platform Stats</Text>
           <View style={styles.platformRow}>
             {[
-              { label: "Products", value: "1,482", icon: "📦", color: "#8b5cf6" },
-              { label: "Banners", value: "7", icon: "🖼️", color: "#ec4899" },
-              { label: "Coupons", value: "12", icon: "🎁", color: "#f59e0b" },
-              { label: "Low Stock", value: "23", icon: "⚠️", color: "#ef4444" },
+              { label: "Products", value: String(platform?.products ?? 0), icon: "📦", color: "#8b5cf6" },
+              { label: "Banners", value: String(platform?.banners ?? 0), icon: "🖼️", color: "#ec4899" },
+              { label: "Coupons", value: String(platform?.coupons ?? 0), icon: "🎁", color: "#f59e0b" },
+              { label: "Low Stock", value: String(platform?.lowStock ?? 0), icon: "⚠️", color: "#ef4444" },
             ].map(s => (
               <View key={s.label} style={styles.platformItem}>
                 <Text style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</Text>

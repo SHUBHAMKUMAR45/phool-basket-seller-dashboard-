@@ -1,51 +1,58 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Api, setToken, getToken } from "./api";
+
+const USER_KEY = "currentUser";
 
 export const AuthService = {
-  // Mock registration: saves user in a list in local storage
   register: async (userData) => {
     try {
-      const existingUsersStr = await AsyncStorage.getItem('users');
-      const users = existingUsersStr ? JSON.parse(existingUsersStr) : [];
-      
-      // Check if user already exists
-      if (users.find(u => u.email === userData.email)) {
-        return { success: false, message: "User with this email already exists." };
-      }
-
-      users.push(userData);
-      await AsyncStorage.setItem('users', JSON.stringify(users));
-      await AsyncStorage.setItem('currentUser', JSON.stringify(userData));
+      const result = await Api.register(userData);
+      await setToken(result.token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.user));
       return { success: true };
     } catch (e) {
-      return { success: false, message: "Registration failed." };
+      return { success: false, message: e.message || "Registration failed." };
     }
   },
 
-  // Mock login: checks against saved users
   login: async (email, password) => {
     try {
-      const usersStr = await AsyncStorage.getItem('users');
-      const users = usersStr ? JSON.parse(usersStr) : [];
-      
-      const user = users.find(u => u.email === email && u.password === password);
-      
-      if (user) {
-        await AsyncStorage.setItem('currentUser', JSON.stringify(user));
-        return { success: true };
-      } else {
-        return { success: false, message: "Invalid email or password." };
-      }
+      const result = await Api.login({ email, password });
+      await setToken(result.token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.user));
+      return { success: true };
     } catch (e) {
-      return { success: false, message: "Login failed." };
+      return { success: false, message: e.message || "Login failed." };
     }
   },
 
   logout: async () => {
-    await AsyncStorage.removeItem('currentUser');
+    await setToken(null);
+    await AsyncStorage.removeItem(USER_KEY);
   },
 
   getCurrentUser: async () => {
-    const userStr = await AsyncStorage.getItem('currentUser');
-    return userStr ? JSON.parse(userStr) : null;
-  }
+    const token = await getToken();
+    if (!token) return null;
+
+    const cached = await AsyncStorage.getItem(USER_KEY);
+    if (cached) {
+      try {
+        await Api.me();
+        return JSON.parse(cached);
+      } catch {
+        await AuthService.logout();
+        return null;
+      }
+    }
+
+    try {
+      const result = await Api.me();
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.user));
+      return result.user;
+    } catch {
+      await AuthService.logout();
+      return null;
+    }
+  },
 };

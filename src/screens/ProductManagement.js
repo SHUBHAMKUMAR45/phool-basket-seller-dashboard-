@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,15 +15,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from 'expo-image-picker';
-
-const INITIAL_PRODUCTS = [
-  { id: "1", name: "Royal Red Roses", price: "499", stock: 25, category: "Roses", discount: "10%", desc: "Premium fresh red roses bouquet.", image: "https://images.unsplash.com/photo-1548610762-7c6afe24c261?w=400&q=80" },
-  { id: "2", name: "Wedding Special", price: "2499", stock: 5, category: "Wedding", discount: "0%", desc: "Grand floral setup for weddings.", image: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=400&q=80" },
-  { id: "3", name: "Birthday Lily", price: "799", stock: 12, category: "Birthday", discount: "5%", desc: "Cheerful lilies for birthday surprises.", image: "https://images.unsplash.com/photo-1560717789-0ac7c58ac90a?w=400&q=80" },
-];
+import { Api } from "../utils/api";
 
 export default function ProductManagement({ navigation }) {
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
@@ -40,6 +36,22 @@ export default function ProductManagement({ navigation }) {
   });
 
   const categories = ["All", "Birthday", "Anniversary", "Wedding", "Roses", "Plants"];
+
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getProducts();
+      setProducts(result.products || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load products.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -72,36 +84,43 @@ export default function ProductManagement({ navigation }) {
     }
   };
 
-  const simulateAIScan = () => {
+  const simulateAIScan = async () => {
     if (!scannedImage) {
       Alert.alert("No Image", "Please upload or take a photo first to scan.");
       return;
     }
     setIsScanning(true);
-    // Simulate AI processing time
-    setTimeout(() => {
-      setForm({
-        name: "Designer Bouquet Mix",
-        price: "1299",
-        stock: "15",
-        category: "Anniversary",
-        desc: "A premium blend of seasonal exotic flowers detected by AI scan.",
-        discount: "10%"
-      });
+    try {
+      const result = await Api.aiScan();
+      setForm(result.suggestion);
+    } catch (e) {
+      Alert.alert("Error", e.message || "AI scan failed.");
+    } finally {
       setIsScanning(false);
-    }, 2000);
+    }
   };
 
-  const handleAdd = () => {
-    if (form.name && form.price) {
-      const product = { 
-        id: Date.now().toString(), 
-        ...form, 
-        image: scannedImage || "https://images.unsplash.com/photo-1522673607200-1648832cee98?w=400&q=80" 
-      };
-      setProducts([product, ...products]);
+  const handleAdd = async () => {
+    if (!form.name || !form.price) return;
+    try {
+      const result = await Api.createProduct({
+        ...form,
+        image: scannedImage || "https://images.unsplash.com/photo-1522673607200-1648832cee98?w=400&q=80",
+      });
+      setProducts([result.product, ...products]);
       setModalVisible(false);
       resetForm();
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to save product.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await Api.deleteProduct(id);
+      setProducts(products.filter((p) => p.id !== id));
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to delete product.");
     }
   };
 
@@ -144,6 +163,9 @@ export default function ProductManagement({ navigation }) {
         </ScrollView>
       </View>
 
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#ec4899" />
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={item => item.id}
@@ -158,13 +180,15 @@ export default function ProductManagement({ navigation }) {
                 {item.discount !== "0%" && <Text style={styles.disc}>{item.discount} OFF</Text>}
               </View>
             </View>
-            <TouchableOpacity onPress={() => setProducts(products.filter(p => p.id !== item.id))}>
+            <TouchableOpacity onPress={() => handleDelete(item.id)}>
               <Text style={styles.delIcon}>🗑️</Text>
             </TouchableOpacity>
           </View>
         )}
         contentContainerStyle={styles.list}
+        ListEmptyComponent={<Text style={{ textAlign: "center", marginTop: 40, color: "#94a3b8" }}>No products found</Text>}
       />
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.overlay}>

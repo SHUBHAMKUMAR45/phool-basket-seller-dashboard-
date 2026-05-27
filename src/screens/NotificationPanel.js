@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,24 +8,54 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Api } from "../utils/api";
 
 export default function NotificationPanel({ navigation }) {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [category, setCategory] = useState("Promotion");
+  const [recent, setRecent] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const categories = ["Promotion", "Festival", "Order Update", "Critical"];
 
-  const handleSend = () => {
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getNotifications();
+      setRecent(result.notifications || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load notifications.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const handleSend = async () => {
     if (!title || !message) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
-    Alert.alert("Success", "Notification sent successfully to all users!");
-    setTitle("");
-    setMessage("");
+    try {
+      setSending(true);
+      await Api.sendNotification({ title, message, category });
+      Alert.alert("Success", "Notification sent successfully to all users!");
+      setTitle("");
+      setMessage("");
+      loadNotifications();
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to send notification.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -79,27 +109,30 @@ export default function NotificationPanel({ navigation }) {
             placeholderTextColor="#94a3b8"
           />
 
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-            <Text style={styles.sendButtonText}>🚀 Send to All Customers</Text>
+          <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={sending}>
+            <Text style={styles.sendButtonText}>
+              {sending ? "Sending..." : "🚀 Send to All Customers"}
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>Recent Broadcasts</Text>
-          <View style={styles.broadcastItem}>
-            <View style={styles.broadcastInfo}>
-              <Text style={styles.broadcastTitle}>Mother's Day Sale Live!</Text>
-              <Text style={styles.broadcastTime}>Today, 10:00 AM • 5,200 reached</Text>
-            </View>
-            <Text style={styles.statusBadge}>Sent</Text>
-          </View>
-          <View style={styles.broadcastItem}>
-            <View style={styles.broadcastInfo}>
-              <Text style={styles.broadcastTitle}>New Anniversary Collection</Text>
-              <Text style={styles.broadcastTime}>Yesterday • 4,800 reached</Text>
-            </View>
-            <Text style={styles.statusBadge}>Sent</Text>
-          </View>
+          {loading ? (
+            <ActivityIndicator color="#ec4899" />
+          ) : (
+            recent.map((item) => (
+              <View key={item.id} style={styles.broadcastItem}>
+                <View style={styles.broadcastInfo}>
+                  <Text style={styles.broadcastTitle}>{item.title}</Text>
+                  <Text style={styles.broadcastTime}>
+                    {item.sentAt} • {typeof item.reached === "number" ? item.reached.toLocaleString() : item.reached} reached
+                  </Text>
+                </View>
+                <Text style={styles.statusBadge}>{item.status}</Text>
+              </View>
+            ))
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

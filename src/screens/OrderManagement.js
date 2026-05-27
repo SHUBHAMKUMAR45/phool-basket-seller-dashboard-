@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,23 +8,46 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const INITIAL_ORDERS = [
-  { id: "ORD-1024", customer: "Anshul Verma", amount: "₹1,250", status: "Pending", payment: "Paid", date: "10/05/2026", email: "anshul@example.com", phone: "+91 9876543210" },
-  { id: "ORD-1023", customer: "Riya Sharma", amount: "₹450", status: "Preparing", payment: "COD", date: "10/05/2026", email: "riya@example.com", phone: "+91 8765432109" },
-  { id: "ORD-1022", customer: "Amit Singh", amount: "₹2,100", status: "Shipped", payment: "Paid", date: "09/05/2026", email: "amit@example.com", phone: "+91 7654321098" },
-  { id: "ORD-1021", customer: "Priya Das", amount: "₹899", status: "Delivered", payment: "Paid", date: "08/05/2026", email: "priya@example.com", phone: "+91 6543210987" },
-];
+import { Api } from "../utils/api";
 
 export default function OrderManagement({ navigation }) {
-  const [orders, setOrders] = useState(INITIAL_ORDERS);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   const filters = ["All", "Pending", "Preparing", "Shipped", "Delivered"];
+
+  const loadOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getOrders();
+      setOrders(result.orders || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load orders.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const updateStatus = async (orderId, status) => {
+    try {
+      const result = await Api.updateOrderStatus(orderId, status);
+      setOrders(orders.map((o) => (o.id === orderId ? result.order : o)));
+      setSelectedOrder(result.order);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to update status.");
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -100,12 +123,17 @@ export default function OrderManagement({ navigation }) {
 
       <View style={styles.tableContainer}>
         {renderHeader()}
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#0f172a" />
+        ) : (
         <FlatList
           data={filteredOrders}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 20 }}
+          ListEmptyComponent={<Text style={{ textAlign: "center", marginTop: 40, color: "#94a3b8" }}>No orders found</Text>}
         />
+        )}
       </View>
 
       <Modal visible={!!selectedOrder} animationType="fade" transparent={true}>
@@ -150,10 +178,7 @@ export default function OrderManagement({ navigation }) {
                       <TouchableOpacity 
                         key={s} 
                         style={[styles.statusBtn, selectedOrder.status === s && { backgroundColor: getStatusColor(s) }]}
-                        onPress={() => {
-                          setOrders(orders.map(o => o.id === selectedOrder.id ? {...o, status: s} : o));
-                          setSelectedOrder({...selectedOrder, status: s});
-                        }}
+                        onPress={() => updateStatus(selectedOrder.id, s)}
                       >
                         <Text style={[styles.statusBtnText, selectedOrder.status === s && { color: '#fff' }]}>{s}</Text>
                       </TouchableOpacity>

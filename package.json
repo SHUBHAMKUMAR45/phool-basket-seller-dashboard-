@@ -4,7 +4,9 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android"
+    "android": "expo start --android",
+    "backend": "cd backend && npm start",
+    "backend:dev": "cd backend && npm run dev"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,45 @@ import {
   StatusBar,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthService } from "../utils/auth";
+import { Api } from "../utils/api";
 
 const { width } = Dimensions.get("window");
 
 export default function SellerDashboard({ navigation }) {
+  const [stats, setStats] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      const [statsRes, activityRes] = await Promise.all([
+        Api.getDashboardStats(),
+        Api.getActivities(),
+      ]);
+      setStats(statsRes.stats);
+      setRecentActivity(activityRes.activities || []);
+    } catch {
+      setStats({
+        totalOrders: 0,
+        revenueToday: "₹0",
+        pending: 0,
+        monthlyRev: "₹0",
+        weeklyOrders: [0, 0, 0, 0, 0, 0, 0],
+      });
+      setRecentActivity([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
   const menuItems = [
     { title: "Products", icon: "📦", screen: "ProductManagement", desc: "Inventory control" },
     { title: "Orders", icon: "📋", screen: "OrderManagement", desc: "Track fulfillment" },
@@ -26,11 +58,13 @@ export default function SellerDashboard({ navigation }) {
     { title: "Banners", icon: "🖼️", screen: "Banners", desc: "App ads" },
   ];
 
-  const recentActivity = [
-    { id: 1, type: "order", text: "Order #1024 delivered", time: "2 mins ago" },
-    { id: 2, type: "stock", text: "New bouquet added", time: "1 hour ago" },
-    { id: 3, type: "coupon", text: "Coupon FLOWER20 created", time: "3 hours ago" },
-  ];
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#ec4899" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -59,7 +93,7 @@ export default function SellerDashboard({ navigation }) {
               <Text style={styles.statEmoji}>📦</Text>
             </View>
             <View style={styles.statContent}>
-              <Text style={[styles.statNumber, { color: "#e11d48" }]}>120</Text>
+              <Text style={[styles.statNumber, { color: "#e11d48" }]}>{stats?.totalOrders ?? 0}</Text>
               <Text style={styles.statLabel}>Total Orders</Text>
             </View>
           </View>
@@ -68,7 +102,7 @@ export default function SellerDashboard({ navigation }) {
               <Text style={styles.statEmoji}>💰</Text>
             </View>
             <View style={styles.statContent}>
-              <Text style={[styles.statNumber, { color: "#16a34a" }]}>₹25K</Text>
+              <Text style={[styles.statNumber, { color: "#16a34a" }]}>{stats?.revenueToday ?? "₹0"}</Text>
               <Text style={styles.statLabel}>Revenue Today</Text>
             </View>
           </View>
@@ -81,7 +115,7 @@ export default function SellerDashboard({ navigation }) {
               <Text style={styles.statEmoji}>⏳</Text>
             </View>
             <View style={styles.statContent}>
-              <Text style={[styles.statNumber, { color: "#ca8a04" }]}>15</Text>
+              <Text style={[styles.statNumber, { color: "#ca8a04" }]}>{stats?.pending ?? 0}</Text>
               <Text style={styles.statLabel}>Pending</Text>
             </View>
           </View>
@@ -90,7 +124,7 @@ export default function SellerDashboard({ navigation }) {
               <Text style={styles.statEmoji}>🗓️</Text>
             </View>
             <View style={styles.statContent}>
-              <Text style={[styles.statNumber, { color: "#0284c7" }]}>₹3.2L</Text>
+              <Text style={[styles.statNumber, { color: "#0284c7" }]}>{stats?.monthlyRev ?? "₹0"}</Text>
               <Text style={styles.statLabel}>Monthly Rev</Text>
             </View>
           </View>
@@ -108,7 +142,7 @@ export default function SellerDashboard({ navigation }) {
               </View>
             </View>
             <View style={styles.chartContainer}>
-              {[60, 45, 80, 55, 95, 70, 85].map((h, i) => (
+              {(stats?.weeklyOrders || [0, 0, 0, 0, 0, 0, 0]).map((h, i) => (
                 <View key={i} style={styles.barBox}>
                   <View style={[styles.bar, { height: h }]} />
                   <Text style={styles.barText}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}</Text>

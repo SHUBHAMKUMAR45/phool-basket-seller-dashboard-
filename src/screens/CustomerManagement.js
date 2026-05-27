@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,20 +7,34 @@ import {
   FlatList,
   StatusBar,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const CUSTOMERS = [
-  { id: "1", name: "Anshul Verma", email: "anshul@example.com", phone: "+91 9876543210", orders: 5, spent: "₹4,500", joined: "Jan 2026" },
-  { id: "2", name: "Riya Sharma", email: "riya@example.com", phone: "+91 8765432109", orders: 2, spent: "₹950", joined: "Feb 2026" },
-  { id: "3", name: "Amit Singh", email: "amit@example.com", phone: "+91 7654321098", orders: 12, spent: "₹15,200", joined: "Mar 2026" },
-  { id: "4", name: "Priya Das", email: "priya@example.com", phone: "+91 6543210987", orders: 8, spent: "₹8,900", joined: "Apr 2026" },
-];
+import { Api } from "../utils/api";
 
 export default function CustomerManagement({ navigation }) {
   const [search, setSearch] = useState("");
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = CUSTOMERS.filter(c => 
+  const loadCustomers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getCustomers();
+      setCustomers(result.customers || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load customers.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  const filtered = customers.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
     c.email.toLowerCase().includes(search.toLowerCase())
   );
@@ -80,6 +94,9 @@ export default function CustomerManagement({ navigation }) {
         </View>
       </View>
 
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#ec4899" />
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -87,6 +104,7 @@ export default function CustomerManagement({ navigation }) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={<Text style={styles.empty}>No customers found</Text>}
       />
+      )}
     </SafeAreaView>
   );
 }
