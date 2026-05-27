@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,42 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Api } from "../utils/api";
 
 const { width } = Dimensions.get("window");
 
 export default function AnalyticsPage({ navigation }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const loadAnalytics = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getAnalytics();
+      setData(result);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load analytics.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  if (loading || !data) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#ec4899" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -30,7 +60,7 @@ export default function AnalyticsPage({ navigation }) {
           <Text style={styles.sectionTitle}>Monthly Revenue Growth</Text>
           <View style={styles.chartCard}>
             <View style={styles.barChartRow}>
-              {[30, 45, 60, 40, 80, 95, 70, 85, 100, 75, 90, 110].map((h, i) => (
+              {data.monthlyRevenue.map((h, i) => (
                 <View key={i} style={[styles.bar, { height: h }]} />
               ))}
             </View>
@@ -47,28 +77,17 @@ export default function AnalyticsPage({ navigation }) {
           <Text style={styles.sectionTitle}>Category-wise Sales</Text>
           <View style={styles.pieCard}>
             <View style={styles.pieRow}>
-              <View style={[styles.pieSegment, { backgroundColor: "#ec4899", flex: 0.4 }]} />
-              <View style={[styles.pieSegment, { backgroundColor: "#3b82f6", flex: 0.3 }]} />
-              <View style={[styles.pieSegment, { backgroundColor: "#10b981", flex: 0.2 }]} />
-              <View style={[styles.pieSegment, { backgroundColor: "#f59e0b", flex: 0.1 }]} />
+              {data.categorySales.map((c) => (
+                <View key={c.label} style={[styles.pieSegment, { backgroundColor: c.color, flex: c.percent / 100 }]} />
+              ))}
             </View>
             <View style={styles.legendGrid}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#ec4899" }]} />
-                <Text style={styles.legendText}>Roses (40%)</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#3b82f6" }]} />
-                <Text style={styles.legendText}>Wedding (30%)</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#10b981" }]} />
-                <Text style={styles.legendText}>Birthday (20%)</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#f59e0b" }]} />
-                <Text style={styles.legendText}>Others (10%)</Text>
-              </View>
+              {data.categorySales.map((c) => (
+                <View key={c.label} style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: c.color }]} />
+                  <Text style={styles.legendText}>{c.label} ({c.percent}%)</Text>
+                </View>
+              ))}
             </View>
           </View>
         </View>
@@ -77,12 +96,12 @@ export default function AnalyticsPage({ navigation }) {
         <View style={styles.metricsGrid}>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Monthly Profit</Text>
-            <Text style={styles.metricValue}>₹45,200</Text>
+            <Text style={styles.metricValue}>{data.metrics.monthlyProfit}</Text>
             <Text style={[styles.metricTrend, { color: "#10b981" }]}>+12% ↑</Text>
           </View>
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Order Growth</Text>
-            <Text style={styles.metricValue}>24%</Text>
+            <Text style={styles.metricValue}>{data.metrics.orderGrowth}</Text>
             <Text style={[styles.metricTrend, { color: "#10b981" }]}>+5% ↑</Text>
           </View>
         </View>
@@ -91,11 +110,7 @@ export default function AnalyticsPage({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Best Selling Products</Text>
           <View style={styles.tableCard}>
-            {[
-              { name: "Red Rose Bouquet", sales: "450", growth: "+15%" },
-              { name: "Pink Lilies", sales: "320", growth: "+8%" },
-              { name: "Wedding Special", sales: "210", growth: "+20%" },
-            ].map((item, idx) => (
+            {data.topProducts.map((item, idx) => (
               <View key={idx} style={[styles.tableRow, idx === 2 && { borderBottomWidth: 0 }]}>
                 <Text style={styles.tableName}>{item.name}</Text>
                 <Text style={styles.tableSales}>{item.sales}</Text>

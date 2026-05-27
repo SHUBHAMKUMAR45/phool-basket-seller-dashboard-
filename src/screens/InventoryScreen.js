@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,19 +6,42 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Dimensions,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const STOCK_DATA = [
-  { id: 1, name: "Red Roses", stock: 15, unit: "stems", status: "In Stock" },
-  { id: 2, name: "Yellow Lilies", stock: 4, unit: "bouquets", status: "Low Stock" },
-  { id: 3, name: "White Orchids", stock: 0, unit: "pots", status: "Out of Stock" },
-  { id: 4, name: "Pink Tulips", stock: 20, unit: "stems", status: "In Stock" },
-  { id: 5, name: "Marigold", stock: 8, unit: "kg", status: "Low Stock" },
-];
+import { Api } from "../utils/api";
 
 export default function InventoryScreen({ navigation }) {
+  const [stockData, setStockData] = useState([]);
+  const [alerts, setAlerts] = useState({ outOfStock: [], lowStock: [] });
+  const [loading, setLoading] = useState(true);
+
+  const loadInventory = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getInventory();
+      setStockData(result.inventory || []);
+      setAlerts(result.alerts || { outOfStock: [], lowStock: [] });
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load inventory.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInventory();
+  }, [loadInventory]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#ec4899" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -35,20 +58,28 @@ export default function InventoryScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Urgent Attention</Text>
           <View style={styles.alertList}>
-            <View style={[styles.alertCard, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
-              <Text style={styles.alertEmoji}>🥀</Text>
-              <View style={styles.alertInfo}>
-                <Text style={styles.alertHead}>Out of Stock</Text>
-                <Text style={styles.alertBody}>White Orchids are completely sold out.</Text>
+            {alerts.outOfStock.length > 0 && (
+              <View style={[styles.alertCard, { backgroundColor: "#fef2f2", borderColor: "#fecaca" }]}>
+                <Text style={styles.alertEmoji}>🥀</Text>
+                <View style={styles.alertInfo}>
+                  <Text style={styles.alertHead}>Out of Stock</Text>
+                  <Text style={styles.alertBody}>
+                    {alerts.outOfStock.map((i) => i.name).join(", ")} are completely sold out.
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={[styles.alertCard, { backgroundColor: "#fffbeb", borderColor: "#fef3c7" }]}>
-              <Text style={styles.alertEmoji}>⚠️</Text>
-              <View style={styles.alertInfo}>
-                <Text style={styles.alertHead}>Low Stock Alert</Text>
-                <Text style={styles.alertBody}>Yellow Lilies (4) & Marigold (8kg) are low.</Text>
+            )}
+            {alerts.lowStock.length > 0 && (
+              <View style={[styles.alertCard, { backgroundColor: "#fffbeb", borderColor: "#fef3c7" }]}>
+                <Text style={styles.alertEmoji}>⚠️</Text>
+                <View style={styles.alertInfo}>
+                  <Text style={styles.alertHead}>Low Stock Alert</Text>
+                  <Text style={styles.alertBody}>
+                    {alerts.lowStock.map((i) => `${i.name} (${i.stock} ${i.unit})`).join(", ")} are low.
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
         </View>
 
@@ -61,7 +92,7 @@ export default function InventoryScreen({ navigation }) {
               <Text style={[styles.headText, { flex: 1 }]}>Stock</Text>
               <Text style={[styles.headText, { flex: 1.5 }]}>Status</Text>
             </View>
-            {STOCK_DATA.map((item) => (
+            {stockData.map((item) => (
               <View key={item.id} style={styles.tableRow}>
                 <Text style={[styles.rowText, { flex: 2, fontWeight: "700" }]}>{item.name}</Text>
                 <Text style={[styles.rowText, { flex: 1 }]}>{item.stock} {item.unit}</Text>

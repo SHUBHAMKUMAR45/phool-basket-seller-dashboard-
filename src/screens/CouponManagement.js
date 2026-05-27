@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,24 +9,43 @@ import {
   StatusBar,
   Modal,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const INITIAL_COUPONS = [
-  { id: "1", code: "PHOOL20", discount: "20%", minAmount: "₹499", expiry: "10/06/2026", status: "Active" },
-  { id: "2", code: "WEDDING10", discount: "10%", minAmount: "₹1999", expiry: "31/12/2026", status: "Active" },
-];
+import { Api } from "../utils/api";
 
 export default function CouponManagement({ navigation }) {
-  const [coupons, setCoupons] = useState(INITIAL_COUPONS);
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState({ code: "", discount: "", minAmount: "", expiry: "" });
 
-  const handleAdd = () => {
-    if (form.code && form.discount) {
-      setCoupons([{ id: Date.now().toString(), ...form, status: "Active" }, ...coupons]);
+  const loadCoupons = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getCoupons();
+      setCoupons(result.coupons || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load coupons.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCoupons();
+  }, [loadCoupons]);
+
+  const handleAdd = async () => {
+    if (!form.code || !form.discount) return;
+    try {
+      const result = await Api.createCoupon(form);
+      setCoupons([result.coupon, ...coupons]);
       setModalVisible(false);
       setForm({ code: "", discount: "", minAmount: "", expiry: "" });
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to create coupon.");
     }
   };
 
@@ -58,6 +77,9 @@ export default function CouponManagement({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#0f172a" />
+      ) : (
       <FlatList
         data={coupons}
         keyExtractor={(item) => item.id}
@@ -65,6 +87,7 @@ export default function CouponManagement({ navigation }) {
         contentContainerStyle={styles.list}
         ListHeaderComponent={<Text style={styles.listTitle}>Available Vouchers</Text>}
       />
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.overlay}>

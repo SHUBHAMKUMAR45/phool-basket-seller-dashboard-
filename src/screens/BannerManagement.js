@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,31 +9,62 @@ import {
   StatusBar,
   Modal,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const INITIAL_BANNERS = [
-  { id: 1, title: "Mother's Day Special", type: "Promo", image: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?w=400&q=80" },
-  { id: 2, title: "Summer Sale 20%", type: "Flash", image: "https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=400&q=80" },
-];
+import { Api } from "../utils/api";
 
 export default function BannerManagement({ navigation }) {
-  const [banners, setBanners] = useState(INITIAL_BANNERS);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState({ title: "", type: "Promo" });
 
-  const handleAdd = () => {
-    if (form.title) {
-      const newBanner = {
-        id: Date.now(),
-        ...form,
-        image: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?w=400&q=80"
-      };
-      setBanners([...banners, newBanner]);
+  const loadBanners = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await Api.getBanners();
+      setBanners(result.banners || []);
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to load banners.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBanners();
+  }, [loadBanners]);
+
+  const handleAdd = async () => {
+    if (!form.title) return;
+    try {
+      const result = await Api.createBanner(form);
+      setBanners([...banners, result.banner]);
       setModalVisible(false);
       setForm({ title: "", type: "Promo" });
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to create banner.");
     }
   };
+
+  const handleDelete = async (id) => {
+    try {
+      await Api.deleteBanner(id);
+      setBanners(banners.filter((b) => String(b.id) !== String(id)));
+    } catch (e) {
+      Alert.alert("Error", e.message || "Failed to delete banner.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ flex: 1 }} size="large" color="#ec4899" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -69,7 +100,7 @@ export default function BannerManagement({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.actionBtn, styles.deleteBtn]}
-                  onPress={() => setBanners(banners.filter(b => b.id !== banner.id))}
+                  onPress={() => handleDelete(banner.id)}
                 >
                   <Text style={[styles.actionBtnText, styles.deleteBtnText]}>🗑️ Delete</Text>
                 </TouchableOpacity>
