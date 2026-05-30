@@ -3,10 +3,13 @@
     "name": "PhoolBasketSellerDashboard",
     "slug": "phool-basket-seller-dashboard",
     "version": "1.0.0",
-    "sdkVersion": "49.0.0",
-    "platforms": ["android", "ios"],
+    "sdkVersion": "54.0.0",
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "android": {
-      "package": "com.aanki2607.phoolbasketsellerdashboard",
+      "package": "com.PhoolBasket.PhoolBasketSellerDashboard",
       "versionCode": 1
     },
     "extra": {
@@ -16,4 +19,3 @@
     }
   }
 }
-

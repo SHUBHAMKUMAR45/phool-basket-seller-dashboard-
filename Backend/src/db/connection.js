@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { defaultDb } = require('../store');
 
 async function init() {
-  const url = process.env.MONGO_URL;
+  const url = process.env.MONGO_URL || process.env.MONGODB_URI;
   if (!url) {
     console.log('ℹ MONGO_URL not set - running without MongoDB. Using file-based DB.');
     return;
